@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bring Your Own LLM – Modal AI POC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-primary: 'Inter', sans-serif;
+
+      /* Light theme */
+      --bg-primary: #f0f4f9;   /* page background */
+      --bg-secondary: #003087; /* slide canvas background (dark blue) */
+      --bg-accent: #f8fafc;    /* card/panel background on slides (light) */
+
+      --text-primary: #e2e8f0;   /* default light text for dark slide */
+      --text-secondary: #cbd5e1; /* softer light text for dark slide */
+
+      --accent-color: #4299e1;
+      --highlight-color: #00A499;
+    }
+    html.dark {
+      --bg-primary: #1a202c;
+      --bg-secondary: #2d3748;  /* dark slide background */
+      --bg-accent: #273041;     /* dark card/panel */
+      --text-primary: #e2e8f0;
+      --text-secondary: #a0aec0;
+      --accent-color: #4299e1;
+      --highlight-color: #4fd1c5;
+    }
+
+    body {
+      font-family: var(--font-primary);
+      background-color: var(--bg-primary);
+      color: var(--text-secondary);
+    }
+
+    /* Slides */
+    .slide {
+      display: none;
+      opacity: 0;
+      transition: opacity 0.4s ease-in-out;
+    }
+    .slide.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    /* Text defaults on slide background */
+    .slide { color: var(--text-primary); }
+    .slide p, .slide li, .slide span, .slide small { color: var(--text-secondary); }
+    .slide h1, .slide h2, .slide h3, .slide h4, .slide h5, .slide h6 { color: #fff; }
+
+    /* Light surfaces */
+    html:not(.dark) .bg-accent,
+    html:not(.dark) .bg-white,
+    html:not(.dark) .surface-light {
+      color: #1f2937; /* slate-800 */
+    }
+    html:not(.dark) .bg-accent p,
+    html:not(.dark) .bg-accent li,
+    html:not(.dark) .bg-accent span,
+    html:not(.dark) .bg-accent small,
+    html:not(.dark) .bg-white p,
+    html:not(.dark) .bg-white li,
+    html:not(.dark) .bg-white span,
+    html:not(.dark) .bg-white small,
+    html:not(.dark) .surface-light p,
+    html:not(.dark) .surface-light li,
+    html:not(.dark) .surface-light span,
+    html:not(.dark) .surface-light small {
+      color: #475569; /* slate-600 */
+    }
+    html:not(.dark) .bg-accent h1,
+    html:not(.dark) .bg-accent h2,
+    html:not(.dark) .bg-accent h3,
+    html:not(.dark) .bg-accent h4,
+    html:not(.dark) .bg-accent h5,
+    html:not(.dark) .bg-accent h6,
+    html:not(.dark) .bg-white h1,
+    html:not(.dark) .bg-white h2,
+    html:not(.dark) .bg-white h3,
+    html:not(.dark) .bg-white h4,
+    html:not(.dark) .bg-white h5,
+    html:not(.dark) .bg-white h6,
+    html:not(.dark) .surface-light h1,
+    html:not(.dark) .surface-light h2,
+    html:not(.dark) .surface-light h3,
+    html:not(.dark) .surface-light h4,
+    html:not(.dark) .surface-light h5,
+    html:not(.dark) .surface-light h6 {
+      color: #1f2937; /* slate-800 */
+    }
+
+    .bg-secondary { background-color: var(--bg-secondary); }
+    .bg-accent { background-color: var(--bg-accent); }
+    .accent-text { color: var(--accent-color); }
+    .highlight-text { color: var(--highlight-color); }
+    .bg-accent-color { background-color: var(--accent-color); }
+
+    /* Simple reveal animation */
+    .slide-content > * {
+      opacity: 0;
+      transform: translateY(12px);
+      animation: reveal 0.5s ease-out forwards;
+    }
+    .slide.active .slide-content > *:nth-child(1) { animation-delay: 0.08s; }
+    .slide.active .slide-content > *:nth-child(2) { animation-delay: 0.16s; }
+    .slide.active .slide-content > *:nth-child(3) { animation-delay: 0.24s; }
+    .slide.active .slide-content > *:nth-child(4) { animation-delay: 0.32s; }
+    @keyframes reveal {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Iframe demo */
+    .iframe-wrapper {
+      position: relative;
+      width: 95%;
+      margin: 0 auto;
+      aspect-ratio: 3 / 2;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      background: #111;
+    }
+    .iframe-wrapper iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #fff;
+    }
+    .iframe-open-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 5;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      backdrop-filter: blur(6px);
+    }
+    .iframe-open-btn span.icon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    /* Gallery */
+    .thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      width: 90%;
+      margin: 1rem auto 0;
+    }
+    .thumb {
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      border-radius: 12px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.2);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      background: #111;
+    }
+    .thumb img {
+      width: 100%;
+      display: block;
+    }
+    .thumb:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 25px rgba(0,0,0,0.3);
+    }
+    .thumb-label {
+      position: absolute;
+      left: 0.75rem;
+      bottom: 0.75rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+    }
+
+    /* Lightbox */
+    #lightbox-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    #lightbox-overlay.active {
+      display: flex;
+    }
+    .lightbox-content {
+      position: relative;
+      max-width: 90vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .lightbox-image-wrapper img {
+      max-width: 100%;
+      max-height: 80vh;
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+    }
+    .lightbox-caption {
+      color: #f5f5f5;
+      font-size: 0.9rem;
+      text-align: center;
+      max-width: 80vw;
+    }
+    .lightbox-prev,
+    .lightbox-next,
+    .lightbox-close {
+      position: absolute;
+      border: none;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      cursor: pointer;
+      border-radius: 999px;
+      width: 40px;
+      height: 40px;
+      font-size: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lightbox-prev {
+      left: -52px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .lightbox-next {
+      right: -52px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .lightbox-close {
+      top: -52px;
+      right: 0;
+      font-size: 1.6rem;
+    }
+    @media (max-width: 768px) {
+      .lightbox-prev { left: 4px; }
+      .lightbox-next { right: 4px; }
+      .lightbox-close { top: -44px; right: 4px; }
+    }
+  </style>
+  <script>
+    // Theme initialisation to avoid flash
+    if (
+      localStorage.getItem('theme') === 'dark' ||
+      (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    ) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  </script>
+</head>
+<body class="flex flex-col h-screen">
+
+  <main id="presentation-container" class="flex-grow overflow-hidden theme-transition">
+    <!-- Slide 1: Title -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center text-center p-8 slide-content">
+        <i class="fas fa-brain text-6xl mb-6 accent-text"></i>
+        <h1 class="text-5xl md:text-6xl font-extrabold leading-tight">
+          Bring Your Own LLM (BYO-LLM) POC SPA Apps
+        </h1>
+        <p class="mt-4 text-2xl opacity-90 max-w-3xl">
+          Structured Large Language Modal prompts, structured outputs, low-risk AI experiments, Single Page Apps
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide 2: Concept -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-10 md:p-12 slide-content">
+        <i class="fas fa-diagram-project text-5xl accent-text mb-6"></i>
+        <h2 class="text-4xl md:text-5xl font-bold text-white mb-8 text-center">
+          What is a “Bring Your Own LLM” POC?
+        </h2>
+        <ul class="space-y-5 text-lg md:text-2xl text-left max-w-4xl">
+          <li class="flex items-start">
+            <i class="fas fa-plug w-7 accent-text mt-1"></i>
+            <span class="ml-4">Front end provides tools, structure, and prompts – but never calls an LLM directly.</span>
+          </li>
+          <li class="flex items-start">
+            <i class="fas fa-user w-7 accent-text mt-1"></i>
+            <span class="ml-4">Users paste prompts into their own LLM of choice (ChatGPT, Copilot, Gemini, local models).</span>
+          </li>
+          <li class="flex items-start">
+            <i class="fas fa-code w-7 accent-text mt-1"></i>
+            <span class="ml-4">Outputs come back as structured JSON or CSV – ready for apps, automations, and future APIs.</span>
+          </li>
+          <li class="flex items-start">
+            <i class="fas fa-shield-alt w-7 accent-text mt-1"></i>
+            <span class="ml-4">Reduces security, procurement, and vendor lock-in concerns while still delivering value.</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Slide 3: Iframe demo -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4 text-center">
+          Checklist Creator – Live Example
+        </h2>
+        <p class="text-lg mb-6 text-center max-w-3xl">
+          Standalone HTML checklist builder that demonstrates the BYO-LLM pattern end to end.
+        </p>
+
+        <div class="iframe-wrapper">
+          <a
+            href="https://pauluk.github.io/Checklist_creator_example/"
+            target="_blank"
+            rel="noopener"
+            class="iframe-open-btn"
+          >
+            <span class="icon">⧉</span>
+            <span>Open in new tab</span>
+          </a>
+          <iframe
+            src="https://pauluk.github.io/Checklist_creator_example/"
+            title="Checklist Creator Example"
+            loading="lazy"
+          ></iframe>
+        </div>
+
+        <p class="mt-4 text-sm md:text-base text-center max-w-3xl">
+          Explore inside the slide, or open it in a full browser tab.
+          The prompt is generated here; the LLM is entirely your choice.
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide 4: Gallery -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4 text-center">
+          Checklist Creator – Visual Walkthrough
+        </h2>
+        <p class="text-lg mb-4 text-center max-w-3xl">
+          Click any thumbnail to open the lightbox. Use the arrow keys or on-screen arrows to cycle.
+        </p>
+        <div class="thumb-grid" id="gallery">
+          <div class="thumb" data-index="0">
+            <img src="https://iili.io/f30pMRn.png" alt="Checklist creator interface" />
+            <div class="thumb-label">Checklist Editor UI</div>
+          </div>
+          <div class="thumb" data-index="1">
+            <img src="https://iili.io/f31Hyzu.png" alt="Generated checklist" />
+            <div class="thumb-label">Generated Checklist</div>
+          </div>
+          <div class="thumb" data-index="2">
+            <img src="https://iili.io/f312S5B.png" alt="Prompt generator" />
+            <div class="thumb-label">Prompt Generator</div>
+          </div>
+          <div class="thumb" data-index="3">
+            <img src="https://iili.io/f31KTHQ.png" alt="Success JSON pasted" />
+            <div class="thumb-label">JSON Pasted Back</div>
+          </div>
+        </div>
+        <p class="mt-3 text-xs md:text-sm text-center">
+          1. Design • 2. Generated checklist • 3. Prompt builder • 4. JSON pasted back into the tool.
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide 5: Flow -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-8 text-center">
+          End-to-End Flow: One SOP → Working Checklist
+        </h2>
+        <div class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div class="flex items-start text-left">
+            <div class="text-4xl md:text-5xl font-bold accent-text mr-4">1</div>
+            <div>
+              <h3 class="text-xl font-semibold text-white">Paste SOP Text</h3>
+              <p class="mt-2 text-sm md:text-base">
+                Drop in unstructured SOP content or a description (e.g. “Generate a checklist for inspecting a Tesla car”).
+              </p>
+            </div>
+          </div>
+          <div class="flex items-start text-left">
+            <div class="text-4xl md:text-5xl font-bold accent-text mr-4">2</div>
+            <div>
+              <h3 class="text-xl font-semibold text-white">Generate a RISEN Prompt</h3>
+              <p class="mt-2 text-sm md:text-base">
+                The tool builds a one-shot prompt with Role, Instruct, Steps, Example, and Narrowing (constraints), targeted at JSON output.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-start text-left">
+            <div class="text-4xl md:text-5xl font-bold accent-text mr-4">3</div>
+            <div>
+              <h3 class="text-xl font-semibold text-white">Run in Your LLM</h3>
+              <p class="mt-2 text-sm md:text-base">
+                The user pastes the prompt into their preferred LLM (ChatGPT, Copilot, Gemini, local) and gets back structured JSON.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-start text-left">
+            <div class="text-4xl md:text-5xl font-bold accent-text mr-4">4</div>
+            <div>
+              <h3 class="text-xl font-semibold text-white">Paste JSON Back</h3>
+              <p class="mt-2 text-sm md:text-base">
+                The JSON is pasted into the tool, which renders a live checklist UI and can export files for reuse and automation.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 6: Benefits -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-8 text-center">
+          Benefits of the BYO-LLM Modal Approach
+        </h2>
+        <div class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div class="flex items-start p-6 bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg surface-light">
+            <i class="fas fa-shield-halved text-3xl accent-text w-12 text-center"></i>
+            <div class="ml-4 text-left">
+              <h3 class="text-xl font-bold mb-1">Low Risk</h3>
+              <p class="text-sm md:text-base leading-relaxed">
+                No LLM keys or credentials in the POC. Users bring their own accounts and tools, which keeps security and procurement simple.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-start p-6 bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg surface-light">
+            <i class="fas fa-arrows-rotate text-3xl accent-text w-12 text-center"></i>
+            <div class="ml-4 text-left">
+              <h3 class="text-xl font-bold mb-1">Vendor Neutral</h3>
+              <p class="text-sm md:text-base leading-relaxed">
+                Works with any LLM – cloud, on-prem, or future models. The contract is the JSON schema, not the provider.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-start p-6 bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg surface-light">
+            <i class="fas fa-layer-group text-3xl accent-text w-12 text-center"></i>
+            <div class="ml-4 text-left">
+              <h3 class="text-xl font-bold mb-1">Reusable Assets</h3>
+              <p class="text-sm md:text-base leading-relaxed">
+                RISEN prompts, JSON examples, and saved files can be shared, versioned, and reused across teams and applications.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-start p-6 bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg surface-light">
+            <i class="fas fa-road text-3xl accent-text w-12 text-center"></i>
+            <div class="ml-4 text-left">
+              <h3 class="text-xl font-bold mb-1">Path to Production</h3>
+              <p class="text-sm md:text-base leading-relaxed">
+                Once the JSON shape is trusted, you can swap copy-paste for server-side LLM calls (Genkit, Power Automate, n8n) without redesigning the front end.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+	
+	    <!-- Slide 5: Application version – SIPOCs & process tooling -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4 text-center">
+          Application – From Checklists POC to Process App
+        </h2>
+
+        <p class="text-lg mb-6 text-center max-w-4xl">
+          Building on the BYO-LLM checklist generator, the next step was a full application that could
+          turn structured SOP outputs into <strong>SIPOCs</strong>, process analysis tools, and
+          chained process views.
+        </p>
+
+        <!-- Application Link Button -->
+        <a href="https://workflow.openerpsolutions.co.uk/"
+           target="_blank"
+           rel="noopener"
+           class="mb-4 inline-flex items-center px-2 py-1 rounded-md bg-accent-color text-white font-semibold shadow-lg hover:scale-105 transition-transform">
+          <i class="fas fa-globe mr-2"></i>
+          Open the Application
+        </a>
+
+        <div class="w-full max-w-5xl mb-8">
+          <ul class="list-disc list-inside space-y-2 text-sm md:text-base">
+            <li><strong>SIPOC generation</strong> from SOPs / checklists (Suppliers, Inputs, Process, Outputs, Customers).</li>
+            <li><strong>Process analysis views</strong> for understanding ownership, hand-offs, and bottlenecks.</li>
+            <li><strong>Process chaining</strong> – linking related checklists and SIPOCs into end-to-end journeys.</li>
+            <li>Built fully from the existing <strong>structured JSON</strong> — no rework needed.</li>
+          </ul>
+        </div>
+
+        <div class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          <!-- App front page -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light flex flex-col">
+            <div class="overflow-hidden rounded-md mb-3">
+              <img
+                src="https://iili.io/f3GrHo7.png"
+                alt="Application front page for process toolkit"
+                class="w-full h-full object-cover"
+              />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1">
+              Application Front Page
+            </h3>
+            <p class="text-xs md:text-sm">
+              Entry point into checklists, SIPOCs, and analysis tools — all powered by structured outputs.
+            </p>
+          </div>
+
+          <!-- SIPOC from SOPs -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light flex flex-col">
+            <div class="overflow-hidden rounded-md mb-3">
+              <img
+                src="https://iili.io/f3G464n.png"
+                alt="SIPOC generated from SOP/checklist"
+                class="w-full h-full object-cover"
+              />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1">
+              SIPOC from SOP / Checklist
+            </h3>
+            <p class="text-xs md:text-sm">
+              The same structured SOP data automatically generates SIPOCs for higher-level visibility.
+            </p>
+          </div>
+
+          <!-- Checklist view -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light flex flex-col">
+            <div class="overflow-hidden rounded-md mb-3">
+              <img
+                src="https://iili.io/f3GQ8TG.png"
+                alt="Example process checklist view"
+                class="w-full h-full object-cover"
+              />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1">
+              Process Checklist View
+            </h3>
+            <p class="text-xs md:text-sm">
+              Enhanced checklist execution with evidence capture, progress tracking, and chainable processes.
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide: Firebase / AI Designer application example -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4 text-center">
+          From Prototypes to Apps – Firebase & AI Designer
+        </h2>
+
+        <p class="text-lg mb-6 text-center max-w-4xl">
+          Once the structured prompt + JSON pattern is stable, it can be wrapped in a full application:
+          a modern front end, Firebase for data and auth, and an AI-assisted “designer” experience on top.
+        </p>
+
+        <div class="w-full max-w-5xl mb-6">
+          <ul class="list-disc list-inside space-y-2 text-sm md:text-base">
+            <li><strong>Firebase (or similar backend)</strong> to store checklists, SIPOCs, and process maps as reusable records.</li>
+            <li><strong>AI designer</strong> front end to guide users through creating and editing structured content.</li>
+            <li><strong>Same JSON contracts</strong> Genkit used for LLM workflows and reporting.</li>
+          </ul>
+        </div>
+
+        <div class="iframe-wrapper">
+          <a
+            href="https://cat.openerpsolutions.co.uk/"
+            target="_blank"
+            rel="noopener"
+            class="iframe-open-btn"
+          >
+            <span class="icon">⧉</span>
+            <span>Open in new tab</span>
+          </a>
+          <iframe
+            src="https://cat.openerpsolutions.co.uk/"
+            title="CAT Application – Firebase / AI Designer Example"
+            loading="lazy"
+          ></iframe>
+        </div>
+
+        <p class="mt-4 text-xs md:text-sm text-center max-w-3xl">
+          This example shows how the same ideas used in a standalone HTML POC can be evolved into a hosted application,
+          with persistent data, user accounts, and richer AI-assisted design flows.
+        </p>
+      </div>
+    </section>
+    <!-- Slide: Claude CLI – Customer Journey Application (Scaled Version) -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-6 md:p-10 slide-content">
+
+        <h2 class="text-2xl md:text-3xl font-bold text-white mb-3 text-center">
+          Claude CLI – Customer Journeys & Personas
+        </h2>
+
+        <p class="text-base md:text-lg mb-4 text-center max-w-3xl">
+          Using structured content to generate <strong>customer journeys</strong>,
+          <strong>personas</strong>, and <strong>journey comparisons</strong> via Claude CLI + Genkit.
+        </p>
+
+        <!-- Application Link -->
+        <a href="https://customerjourney.openerpsolutions.co.uk/"
+           target="_blank"
+           rel="noopener"
+           class="mb-6 inline-flex items-center px-5 py-2 rounded-md bg-accent-color text-white font-semibold shadow-md hover:scale-105 transition-transform text-sm">
+          <i class="fas fa-globe mr-2"></i>
+          Open Customer Journey Application
+        </a>
+
+        <!-- Two–column top block -->
+        <div class="w-full max-w-5xl mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <!-- Left column: bullets -->
+          <div class="text-sm md:text-base">
+            <h3 class="text-lg font-semibold mb-2">From Checklists to Journeys</h3>
+            <ul class="list-disc list-inside space-y-1">
+              <li>Import <strong>structured JSON</strong> from SOPs / checklists.</li>
+              <li>Generate <strong>persona-aware</strong> journey maps.</li>
+              <li>Run <strong>as-is / to-be comparisons</strong>.</li>
+              <li>Export journeys & feed them back into Claude or Genkit.</li>
+            </ul>
+          </div>
+
+          <!-- Right column: small CLI block -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light text-left">
+            <h3 class="text-sm font-semibold mb-1 flex items-center">
+              <i class="fas fa-terminal accent-text mr-2"></i>
+              Claude CLI Example
+            </h3>
+            <pre class="text-[0.65rem] leading-snug bg-white/70 rounded p-2 overflow-x-auto whitespace-pre">
+claude --model claude-3-5-sonnet \
+  --input sop_checklist.json \
+  --prompt-file journey_prompt.txt \
+  > journeys_enriched.json
+            </pre>
+          </div>
+
+        </div>
+
+        <!-- Image grid (scaled carefully) -->
+        <div class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          <!-- App front page -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow p-3 surface-light">
+            <div class="rounded-md overflow-hidden mb-2 h-28 md:h-32">
+              <img
+                src="https://iili.io/f3GrHo7.png"
+                class="w-full h-full object-cover"
+              />
+            </div>
+            <h3 class="text-sm font-semibold mb-1">Application Front Page</h3>
+            <p class="text-xs">
+              Clean interface for journeys, personas, and structured imports/exports.
+            </p>
+          </div>
+
+          <!-- Journey comparisons -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow p-3 surface-light">
+            <div class="rounded-md overflow-hidden mb-2 h-28 md:h-32">
+              <img
+                src="https://iili.io/f3MW0ua.png"
+                class="w-full h-full object-cover"
+              />
+            </div>
+            <h3 class="text-sm font-semibold mb-1">Journey Comparisons</h3>
+            <p class="text-xs">
+              Compare as-is vs to-be journeys or different persona views.
+            </p>
+          </div>
+
+          <!-- Persona management -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow p-3 surface-light">
+            <div class="rounded-md overflow-hidden mb-2 h-28 md:h-32">
+              <img
+                src="https://iili.io/f3MXt5X.png"
+                class="w-full h-full object-cover"
+              />
+            </div>
+            <h3 class="text-sm font-semibold mb-1">Persona Management</h3>
+            <p class="text-xs">
+              Manage personas, import/export JSON, and rerun journeys via Claude or Genkit.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+  <!-- Slide X: LLM links + example prompts -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-6 text-center">
+          Try These LLM Prompts
+        </h2>
+        <p class="text-lg mb-6 text-center max-w-3xl">
+          Open your preferred LLM in another tab, then use the copy buttons to paste a complete prompt and generate a standalone HTML tool.
+        </p>
+
+        <div class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Left: LLM links -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-6 surface-light flex flex-col">
+            <h3 class="text-xl font-bold mb-4 flex items-center">
+              <i class="fas fa-link accent-text mr-3"></i> LLMs to Try
+            </h3>
+            <div class="space-y-3">
+              <a href="https://chat.openai.com/" target="_blank" rel="noopener" class="flex items-center px-3 py-2 rounded-md bg-white/70 hover:bg-white shadow-sm text-sm">
+                <i class="fas fa-comments accent-text w-6 text-center mr-2"></i>
+                <span>ChatGPT (OpenAI)</span>
+              </a>
+              <a href="https://claude.ai/" target="_blank" rel="noopener" class="flex items-center px-3 py-2 rounded-md bg-white/70 hover:bg-white shadow-sm text-sm">
+                <i class="fas fa-comment-dots accent-text w-6 text-center mr-2"></i>
+                <span>Claude</span>
+              </a>
+              <a href="https://gemini.google.com/" target="_blank" rel="noopener" class="flex items-center px-3 py-2 rounded-md bg-white/70 hover:bg-white shadow-sm text-sm">
+                <i class="fas fa-gem accent-text w-6 text-center mr-2"></i>
+                <span>Google Gemini</span>
+              </a>
+              <a href="https://ollama.com" target="_blank" rel="noopener" class="flex items-center px-3 py-2 rounded-md bg-white/70 hover:bg-white shadow-sm text-sm">
+                <i class="fas fa-server accent-text w-6 text-center mr-2"></i>
+                <span>Local models (e.g. Ollama / LM Studio)</span>
+              </a>
+            </div>
+            <p class="mt-4 text-xs text-gray-500">
+              These prompts are designed to be model-agnostic and work in a “Bring Your Own LLM” setup.
+            </p>
+          </div>
+
+          <!-- Right: Prompt cards -->
+          <div class="space-y-4">
+            <!-- Prompt 1: Flashcard builder -->
+            <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-5 surface-light">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-lg font-semibold flex items-center">
+                  <i class="fas fa-layer-group accent-text mr-2"></i>
+                  Bootstrap JSON Flashcard Builder
+                </h3>
+                <button
+                  type="button"
+                  class="prompt-copy-btn text-xs font-semibold px-3 py-1 rounded-md bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 flex items-center"
+                  data-prompt-id="flashcards"
+                >
+                  <i class="fas fa-copy mr-1"></i> Copy prompt
+                </button>
+              </div>
+              <p class="text-xs text-gray-600 mb-2">
+                Generates a standalone Bootstrap HTML page that imports/exports JSON flashcards, supports scoring, multiple choice, filters, and ratings.
+              </p>
+              <pre class="text-[0.7rem] leading-snug bg-white/70 rounded p-2 overflow-x-auto whitespace-pre-wrap">
+Creates a HTML + JS flashcard trainer using JSON as the storage format (import/export via a text area).</pre>
+            </div>
+
+            <!-- Prompt 2: Local scratch pad task list -->
+            <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-5 surface-light">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-lg font-semibold flex items-center">
+                  <i class="fas fa-list-check accent-text mr-2"></i>
+                  Local “Scratch Pad” Task List
+                </h3>
+                <button
+                  type="button"
+                  class="prompt-copy-btn text-xs font-semibold px-3 py-1 rounded-md bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 flex items-center"
+                  data-prompt-id="scratchpad"
+                >
+                  <i class="fas fa-copy mr-1"></i> Copy prompt
+                </button>
+              </div>
+              <p class="text-xs text-gray-600 mb-2">
+                Asks the LLM to build a simple local HTML task list that stores updates in a temporary scratch pad (browser only, no backend).
+              </p>
+              <pre class="text-[0.7rem] leading-snug bg-white/70 rounded p-2 overflow-x-auto whitespace-pre-wrap">
+Creates a local-only task list HTML page, ideal for quick personal scratch-pad usage.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+	
+	    <!-- Slide: Remixing Examples into New Ideas -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4 text-center">
+          From Examples to New Ideas & Better Work
+        </h2>
+
+        <p class="text-lg mb-6 text-center max-w-4xl">
+          Once you have one working pattern – like the checklist generator or journey app – you can
+          <strong>pivot, remix, and extend</strong> it into new tools that make jobs easier, richer,
+          and more consistent.
+        </p>
+
+        <div class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <!-- Card 1: Pivot from existing examples -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-6 surface-light">
+            <h3 class="text-xl font-semibold mb-2">
+              Start from a Working Example
+            </h3>
+            <p class="text-sm mb-3">
+              Treat each POC (checklist creator, SIPOC builder, journey mapper) as a <strong>template</strong>:
+            </p>
+            <ul class="list-disc list-inside space-y-1 text-sm">
+              <li>Swap the JSON shape to track <strong>risks, controls, or training modules</strong>.</li>
+              <li>Reuse the same RISEN prompt, but change the domain (e.g. payroll, fraud, customer care).</li>
+              <li>Keep the “Bring Your Own LLM” approach until the pattern is stable.</li>
+            </ul>
+          </div>
+
+          <!-- Card 2: Remix ideas for new business value -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-6 surface-light">
+            <h3 class="text-xl font-semibold mb-2">
+              Remix to Generate New Value
+            </h3>
+            <p class="text-sm mb-3">
+              Once the pattern works, ask “what else could use this?”:
+            </p>
+            <ul class="list-disc list-inside space-y-1 text-sm">
+              <li>Turn SOP checklists into <strong>training flashcards</strong> or quizzes for new starters.</li>
+              <li>Use SIPOCs to design <strong>handover packs</strong> between teams or services.</li>
+              <li>Hook JSON outputs into <strong>Power Automate / n8n</strong> for reminders, approvals, and logging.</li>
+            </ul>
+          </div>
+
+          <!-- Card 3: AI as integration glue -->
+          <div class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-6 surface-light">
+            <h3 class="text-xl font-semibold mb-2">
+              AI as the Integration Layer
+            </h3>
+            <p class="text-sm mb-3">
+              Use AI to build the small tools that sit in the gaps:
+            </p>
+            <ul class="list-disc list-inside space-y-1 text-sm">
+              <li>Generate JSON config files from human-readable policies.</li>
+              <li>Create <strong>test data, example scenarios, and acceptance criteria</strong> from real processes.</li>
+              <li>Wrap everything in small HTML tools so non-technical colleagues can use them safely.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Inspiration links row -->
+        <div class="w-full max-w-6xl">
+          <h3 class="text-base md:text-lg font-semibold mb-2 text-center">
+            Inspiration & Integration Ideas
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+            <a href="https://n8n.io" target="_blank" rel="noopener"
+               class="bg-accent dark:bg-gray-800/50 rounded-lg p-3 flex flex-col items-center justify-center surface-light hover:shadow-md hover:scale-105 transition-transform">
+              <i class="fas fa-diagram-project text-xl accent-text mb-1"></i>
+              <span class="font-semibold text-center">n8n</span>
+              <span class="text-xs text-center">Low-code workflows using your JSON outputs as triggers or data.</span>
+            </a>
+            <a href="https://make.com" target="_blank" rel="noopener"
+               class="bg-accent dark:bg-gray-800/50 rounded-lg p-3 flex flex-col items-center justify-center surface-light hover:shadow-md hover:scale-105 transition-transform">
+              <i class="fas fa-plug text-xl accent-text mb-1"></i>
+              <span class="font-semibold text-center">Make (Integromat)</span>
+              <span class="text-xs text-center">Connect forms, emails, and spreadsheets to AI-generated structures.</span>
+            </a>
+            <a href="https://learn.microsoft.com/power-automate/" target="_blank" rel="noopener"
+               class="bg-accent dark:bg-gray-800/50 rounded-lg p-3 flex flex-col items-center justify-center surface-light hover:shadow-md hover:scale-105 transition-transform">
+              <i class="fas fa-cloud text-xl accent-text mb-1"></i>
+              <span class="font-semibold text-center">Power Automate</span>
+              <span class="text-xs text-center">Turn checklists and journeys into approvals, reminders, and logs.</span>
+            </a>
+            <a href="https://github.com/openai/openai-cookbook" target="_blank" rel="noopener"
+               class="bg-accent dark:bg-gray-800/50 rounded-lg p-3 flex flex-col items-center justify-center surface-light hover:shadow-md hover:scale-105 transition-transform">
+              <i class="fas fa-book text-xl accent-text mb-1"></i>
+              <span class="font-semibold text-center">AI Cookbook Ideas</span>
+              <span class="text-xs text-center">Explore patterns you can adapt into your own internal tools.</span>
+            </a>
+          </div>
+          <p class="mt-3 text-xs text-center text-gray-300">
+            The goal is not just “one good demo” – it’s a <strong>library of patterns</strong> you can reuse,
+            pivot, and combine to improve real work.
+          </p>
+        </div>
+
+      </div>
+    </section>
+    <!-- Slide: Prompt Cheatsheets & Inspiration (Correct Image → Link Mapping) -->
+    <section class="slide w-full h-full bg-secondary">
+      <div class="w-full h-full flex flex-col justify-center items-center p-6 md:p-10 slide-content">
+
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4 text-center">
+          Prompt Cheatsheets & Inspiration
+        </h2>
+
+        <p class="text-base md:text-lg mb-6 text-center max-w-4xl">
+          Explore adaptable prompt examples — each a standalone page you can open, study, remix, and reuse.
+        </p>
+
+        <!-- FULL TILE GRID (6 ITEMS) -->
+        <div class="w-full max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+
+          <!-- BA Sparks (Business Analyst) -->
+          <a href="https://openerpsolutions.co.uk/business_analyst_prompts_cheatsheet.html"
+             target="_blank" rel="noopener"
+             class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light 
+                    hover:scale-[1.03] hover:shadow-xl transition-transform flex flex-col">
+            <div class="rounded-md overflow-hidden mb-2 h-24">
+              <img src="https://iili.io/f3Vq5Sn.png"
+                   alt="BA Sparks prompts"
+                   class="w-full h-full object-cover" />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1 flex items-center">
+              <i class="fas fa-chart-line accent-text mr-2"></i>
+              BA Prompt Sparks
+            </h3>
+            <p class="text-xs">Structured prompts for SIPOCs, process mapping, analysis and requirements.</p>
+          </a>
+
+          <!-- Learning Sparks -->
+          <a href="https://openerpsolutions.co.uk/learning_prompts_cheatsheet.html"
+             target="_blank" rel="noopener"
+             class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light 
+                    hover:scale-[1.03] hover:shadow-xl transition-transform flex flex-col">
+            <div class="rounded-md overflow-hidden mb-2 h-24">
+              <img src="https://iili.io/f3VC3kg.png"
+                   alt="Learning sparks prompts"
+                   class="w-full h-full object-cover" />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1 flex items-center">
+              <i class="fas fa-graduation-cap accent-text mr-2"></i>
+              Learning Prompt Sparks
+            </h3>
+            <p class="text-xs">Turn SOPs and documents into tutorials, quizzes, learning flows and exercises.</p>
+          </a>
+
+          <!-- Email Cheatsheet -->
+          <a href="https://openerpsolutions.co.uk/cheatsheet_email_prompts.html"
+             target="_blank" rel="noopener"
+             class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light 
+                    hover:scale-[1.03] hover:shadow-xl transition-transform flex flex-col">
+            <div class="rounded-md overflow-hidden mb-2 h-24">
+              <img src="https://iili.io/f3VKEb4.png"
+                   alt="Email prompt cheatsheet / pet generator"
+                   class="w-full h-full object-cover" />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1 flex items-center">
+              <i class="fas fa-envelope-open-text accent-text mr-2"></i>
+              Email Prompt Cheatsheet
+            </h3>
+            <p class="text-xs">Template prompts for drafting, rewriting and enhancing emails in seconds.</p>
+          </a>
+
+          <!-- Creative Cheatsheet -->
+          <a href="https://openerpsolutions.co.uk/cheatsheet_creative_prompts.html"
+             target="_blank" rel="noopener"
+             class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light 
+                    hover:scale-[1.03] hover:shadow-xl transition-transform flex flex-col">
+            <div class="rounded-md overflow-hidden mb-2 h-24">
+              <img src="https://iili.io/f3VfI2e.png"
+                   alt="Action figure creative prompt"
+                   class="w-full h-full object-cover" />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1 flex items-center">
+              <i class="fas fa-wand-magic-sparkles accent-text mr-2"></i>
+              Creative Prompt Cheatsheet
+            </h3>
+            <p class="text-xs">Visual + creative sparks for artwork, concept design and campaign ideas.</p>
+          </a>
+
+          <!-- Pet Action Figure Prompt -->
+          <a href="https://openerpsolutions.co.uk/action_figure_prompt-pet.html"
+             target="_blank" rel="noopener"
+             class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light 
+                    hover:scale-[1.03] hover:shadow-xl transition-transform flex flex-col">
+            <div class="rounded-md overflow-hidden mb-2 h-24">
+              <img src="https://iili.io/f3VKEb4.png"
+                   alt="Pet action figure generator"
+                   class="w-full h-full object-cover" />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1 flex items-center">
+              <i class="fas fa-paw accent-text mr-2"></i>
+              Pet Action-Figure Prompt
+            </h3>
+            <p class="text-xs">A fun structured prompt example — perfect for creative AI projects.</p>
+          </a>
+
+          <!-- Action Figure Prompt -->
+          <a href="https://openerpsolutions.co.uk/action_figure_prompt.html"
+             target="_blank" rel="noopener"
+             class="bg-accent dark:bg-gray-800/50 rounded-lg shadow-lg p-3 surface-light 
+                    hover:scale-[1.03] hover:shadow-xl transition-transform flex flex-col">
+            <div class="rounded-md overflow-hidden mb-2 h-24">
+              <img src="https://iili.io/f3VfI2e.png"
+                   alt="Action figure prompt rectangle"
+                   class="w-full h-full object-cover" />
+            </div>
+            <h3 class="text-sm md:text-base font-semibold mb-1 flex items-center">
+              <i class="fas fa-robot accent-text mr-2"></i>
+              Action-Figure Prompt
+            </h3>
+            <p class="text-xs">Shows structured prompt control over style, pose, lighting & accessories.</p>
+          </a>
+
+        </div>
+
+        <p class="mt-2 text-xs text-center text-gray-300">
+          All tiles open in a new window — easy to explore, copy and adapt.
+        </p>
+
+      </div>
+    </section>
+<!-- Slide: Complete RISEN Demo One-Shot Prompts -->
+<section class="slide w-full h-full bg-secondary">
+  <div class="w-full h-full flex flex-col justify-center items-center p-6 md:p-10 slide-content">
+
+    <h2 class="text-3xl font-bold text-white text-center mb-4">
+      Complete RISEN One-Shot Demo Prompts
+    </h2>
+
+    <p class="text-sm md:text-base text-center max-w-4xl mb-6">
+      Copy any of these into an LLM, JSBin, or save them as a <code>.html</code> file to generate structured JSON  
+      for dynamic tables, diagrams, charts, PDFs, JD3 views, audit checklists and game engines.
+    </p>
+
+    <!-- PROMPT GRID -->
+    <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-4 text-[0.70rem]">
+
+      <!-- AUDIT CHECKLIST RISEN (C.A.R.T.) -->
+      <div class="bg-accent dark:bg-gray-800/50 p-3 rounded-lg surface-light shadow hover:scale-[1.02] transition">
+        <h3 class="font-semibold mb-1 flex items-center">
+          <i class="fas fa-clipboard-check accent-text mr-2"></i>Audit Checklist (C.A.R.T.)
+        </h3>
+        <button class="copy-btn bg-gray-200 dark:bg-gray-600 text-[0.65rem] py-1 px-2 rounded mb-2"
+                data-prompt="ROLE: Expert Auditor. INFORMATION: You assess an SOP using the RISEN framework and C.A.R.T. principles (Consistent, Achievable, Repeatable, Transparent). STEPS: For each principle, extract risks and convert into a checklist of at least 2 questions. FORMAT: {consistent:[{question:''}], achievable:[{question:''}], repeatable:[{question:''}], transparent:[{question:''}]}. NARROWING: Use British English. Valid JSON only. INPUT SOP JSON: {{{sopJson}}}">
+          Copy
+        </button>
+        <p>Generate a structured audit checklist from any SOP JSON.</p>
+      </div>
+
+      <!-- MERMAID SEQUENCE / FLOWCHART RISEN -->
+      <div class="bg-accent dark:bg-gray-800/50 p-3 rounded-lg surface-light shadow hover:scale-[1.02] transition">
+        <h3 class="font-semibold mb-1 flex items-center">
+          <i class="fas fa-project-diagram accent-text mr-2"></i>Mermaid Diagram (Flow / Sequence)
+        </h3>
+        <button class="copy-btn bg-gray-200 dark:bg-gray-600 text-[0.65rem] py-1 px-2 rounded mb-2"
+                data-prompt="ROLE: Expert Process Analyst. INFORMATION: Convert raw SOP text into a Mermaid diagram. STEPS: 1) Identify phases. 2) Extract actions. 3) Map order. FORMAT: Output ONLY Mermaid syntax in ```mermaid``` block. Choose flowchart TD or sequence depending on text. NARROWING: British English, no commentary. INPUT: {Paste SOP}">
+          Copy
+        </button>
+        <p>Outputs Mermaid for instant rendering.</p>
+      </div>
+
+      <!-- TABLE + FILTER (DATATABLES) RISEN -->
+      <div class="bg-accent dark:bg-gray-800/50 p-3 rounded-lg surface-light shadow hover:scale-[1.02] transition">
+        <h3 class="font-semibold mb-1 flex items-center">
+          <i class="fas fa-table accent-text mr-2"></i>DataTable JSON (Search/Sort/Filter)
+        </h3>
+        <button class="copy-btn bg-gray-200 dark:bg-gray-600 text-[0.65rem] py-1 px-2 rounded mb-2"
+                data-prompt="ROLE: Data Modeller. INFORMATION: Convert list text into DataTables-ready structure. STEPS: Extract column headings → normalise → return {columns:[{title:''}], data:[[...]]}. NARROWING: British English, valid JSON. INPUT: {Paste unstructured table text}">
+          Copy
+        </button>
+        <p>Paste JSON into your table POC to generate searchable tables.</p>
+      </div>
+
+      <!-- PLOTLY CHART RISEN -->
+      <div class="bg-accent dark:bg-gray-800/50 p-3 rounded-lg surface-light shadow hover:scale-[1.02] transition">
+        <h3 class="font-semibold mb-1 flex items-center">
+          <i class="fas fa-chart-bar accent-text mr-2"></i>Plotly Chart JSON
+        </h3>
+        <button class="copy-btn bg-gray-200 dark:bg-gray-600 text-[0.65rem] py-1 px-2 rounded mb-2"
+                data-prompt="ROLE: Expert Data Visualiser. INFORMATION: Convert the provided dataset into Plotly JSON. STEPS: Extract axes → normalise values → output {type:'bar|line', x:[], y:[], title:''}. NARROWING: British English, only valid JSON. INPUT:{Paste data}">
+          Copy
+        </button>
+        <p>Use in your chart POC with Plotly.js CDN.</p>
+      </div>
+
+      <!-- PDF GENERATION RISEN -->
+      <div class="bg-accent dark:bg-gray-800/50 p-3 rounded-lg surface-light shadow hover:scale-[1.02] transition">
+        <h3 class="font-semibold mb-1 flex items-center">
+          <i class="fas fa-file-pdf accent-text mr-2"></i>PDF Layout JSON (jsPDF)
+        </h3>
+        <button class="copy-btn bg-gray-200 dark:bg-gray-600 text-[0.65rem] py-1 px-2 rounded mb-2"
+                data-prompt="ROLE: Document Designer. INFORMATION: Turn text into a PDF structure. STEPS: Extract title, sections, bullet points. FORMAT:{title:'', sections:[{heading:'', bullets:[]}]} NARROWING: JSON only, British English. INPUT:{Paste content}">
+          Copy
+        </button>
+        <p>Feed directly into your jsPDF POC.</p>
+      </div>
+
+      <!-- JD3 JSON DIAGRAM RISEN -->
+      <div class="bg-accent dark:bg-gray-800/50 p-3 rounded-lg surface-light shadow hover:scale-[1.02] transition">
+        <h3 class="font-semibold mb-1 flex items-center">
+          <i class="fas fa-sitemap accent-text mr-2"></i>JD3 Diagram JSON
+        </h3>
+        <button class="copy-btn bg-gray-200 dark:bg-gray-600 text-[0.65rem] py-1 px-2 rounded mb-2"
+                data-prompt="ROLE: Systems Architect. INFORMATION: Convert a process into the JD3 JSON format. STEPS: Identify nodes → map relationships → produce {nodes:[{id:'',label:''}], edges:[{from:'',to:''}]}. NARROWING: Valid JSON, British English. INPUT:{Paste process}">
+          Copy
+        </button>
+        <p>Generates diagrams in your JD3 renderer.</p>
+      </div>
+
+      <!-- GAME ENGINE (Flashcards / Scoring) RISEN -->
+      <div class="bg-accent dark:bg-gray-800/50 p-3 rounded-lg surface-light shadow hover:scale-[1.02] transition col-span-1 md:col-span-2">
+        <h3 class="font-semibold mb-1 flex items-center">
+          <i class="fas fa-dice accent-text mr-2"></i>Training Game / Flashcard Logic JSON
+        </h3>
+        <button class="copy-btn bg-gray-200 dark:bg-gray-600 text-[0.65rem] py-1 px-2 rounded mb-2"
+                data-prompt="ROLE: Learning Designer. INFORMATION: Create a JSON flashcard/game structure. STEPS: Extract knowledge → generate cards → classify as mcq|rating|text → assign scoring. FORMAT:{cards:[{type:'mcq',question:'',options:[],answer:'',score:0}]} NARROWING: JSON only, British English. INPUT:{Paste content}">
+          Copy
+        </button>
+        <p>Your HTML game engine can load this JSON and run immediately.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+  </main>
+
+  <!-- Footer/navigation -->
+  <footer class="flex items-center justify-between w-full p-4 bg-white border-t border-gray-200 theme-transition dark:bg-gray-800 dark:border-gray-700">
+    <button id="prevBtn" class="bg-accent-color text-white font-bold py-2 px-6 rounded-md shadow-sm hover:opacity-80 transition-opacity disabled:opacity-50">
+      <i class="fas fa-arrow-left mr-2"></i> Prev
+    </button>
+    <div class="flex items-center gap-4">
+      <div id="slide-counter" class="text-gray-700 font-semibold dark:text-gray-300"></div>
+      <button id="darkModeToggle" class="text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white text-xl transition-colors">
+        <i class="fas fa-sun block dark:hidden"></i>
+        <i class="fas fa-moon hidden dark:block"></i>
+      </button>
+    </div>
+    <button id="nextBtn" class="bg-accent-color text-white font-bold py-2 px-6 rounded-md shadow-sm hover:opacity-80 transition-opacity">
+      Next <i class="fas fa-arrow-right ml-2"></i>
+    </button>
+  </footer>
+
+  <!-- Lightbox overlay -->
+  <div id="lightbox-overlay">
+    <div class="lightbox-content">
+      <button class="lightbox-close" type="button" aria-label="Close">&times;</button>
+      <div class="lightbox-image-wrapper relative">
+        <button class="lightbox-prev" type="button" aria-label="Previous">❮</button>
+        <img id="lightbox-image" src="" alt="">
+        <button class="lightbox-next" type="button" aria-label="Next">❯</button>
+      </div>
+      <div class="lightbox-caption" id="lightbox-caption"></div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const slideCounter = document.getElementById('slide-counter');
+      const darkModeToggle = document.getElementById('darkModeToggle');
+      let currentSlide = 0;
+
+      function showSlide(index) {
+        if (index < 0 || index >= slides.length) return;
+        slides.forEach((s, i) => s.classList.toggle('active', i === index));
+        currentSlide = index;
+        slideCounter.textContent = `Slide ${currentSlide + 1} / ${slides.length}`;
+        prevBtn.disabled = currentSlide === 0;
+        nextBtn.disabled = currentSlide === slides.length - 1;
+      }
+
+      prevBtn.addEventListener('click', () => {
+        if (currentSlide > 0) showSlide(currentSlide - 1);
+      });
+      nextBtn.addEventListener('click', () => {
+        if (currentSlide < slides.length - 1) showSlide(currentSlide + 1);
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') prevBtn.click();
+        if (e.key === 'ArrowRight') nextBtn.click();
+      });
+
+      darkModeToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme',
+          document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+        );
+      });
+
+      // Lightbox logic
+      const images = [
+        {
+          src: "https://iili.io/f30pMRn.png",
+          caption: "Checklist Editor UI — the main builder interface."
+        },
+        {
+          src: "https://iili.io/f31Hyzu.png",
+          caption: "Generated checklist — structured items grouped into stages."
+        },
+        {
+          src: "https://iili.io/f312S5B.png",
+          caption: "Prompt generator — the RISEN-style LLM prompt template."
+        },
+        {
+          src: "https://iili.io/f31KTHQ.png",
+          caption: "Success — JSON pasted back and rendered as a checklist."
+        }
+      ];
+      const overlay = document.getElementById('lightbox-overlay');
+      const imgEl = document.getElementById('lightbox-image');
+      const captionEl = document.getElementById('lightbox-caption');
+      const btnClose = overlay.querySelector('.lightbox-close');
+      const btnPrev = overlay.querySelector('.lightbox-prev');
+      const btnNext = overlay.querySelector('.lightbox-next');
+      let currentImageIndex = 0;
+
+      function showImage(idx) {
+        if (idx < 0) idx = images.length - 1;
+        if (idx >= images.length) idx = 0;
+        currentImageIndex = idx;
+        imgEl.src = images[idx].src;
+        captionEl.textContent = images[idx].caption;
+      }
+      function openLightbox(idx) {
+        showImage(idx);
+        overlay.classList.add('active');
+      }
+      function closeLightbox() {
+        overlay.classList.remove('active');
+      }
+
+      document.body.addEventListener('click', (e) => {
+        const thumb = e.target.closest('#gallery .thumb');
+        if (thumb) {
+          const idx = parseInt(thumb.dataset.index, 10) || 0;
+          openLightbox(idx);
+        }
+      });
+
+      btnClose.addEventListener('click', closeLightbox);
+      btnPrev.addEventListener('click', () => showImage(currentImageIndex - 1));
+      btnNext.addEventListener('click', () => showImage(currentImageIndex + 1));
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeLightbox();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (!overlay.classList.contains('active')) return;
+        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'ArrowLeft') showImage(currentImageIndex - 1);
+        if (e.key === 'ArrowRight') showImage(currentImageIndex + 1);
+      });
+
+      // Initial render
+      showSlide(0);
+    });
+  </script>
+</body>
+</html>
