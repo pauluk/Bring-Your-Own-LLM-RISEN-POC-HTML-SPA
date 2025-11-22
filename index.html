@@ -1036,33 +1036,63 @@ Creates a local-only task list HTML page, ideal for quick personal scratch-pad u
       </div>
     </section>
 <section class="slide w-full h-full bg-secondary">
-  <div class="w-full h-full flex flex-col justify-center items-center p-8 md:p-12 slide-content">
+  <div class="w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-8 p-8 md:p-12 slide-content">
 
-    <h2 class="text-3xl md:text-4xl font-bold text-white mb-4 text-center">
-      Rapid How-To Guides with AI Voice + Video Editing
-    </h2>
+    <!-- LEFT COLUMN: TEXT CONTENT -->
+    <div class="flex flex-col justify-center text-left space-y-6">
 
-    <p class="text-lg mb-6 text-center max-w-4xl">
-      Produce professional tutorial videos in minutes: generate voice-over with Eleven Labs and edit visuals using Clipchamp (free tier), then publish or embed easily.
-    </p>
+      <h2 class="text-3xl md:text-4xl font-bold text-white">
+        Rapid How-To Guide Creation with AI Voice & Video
+      </h2>
 
-    <!-- Video demo embed -->
-    <div class="mb-6 w-full max-w-4xl aspect-ratio-16/9">
-      <iframe width="100%" height="100%" src="https://www.youtube.com/embed/sklPInQSh3c" title="AI video voice tutorial demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      <p class="text-lg max-w-xl text-secondary">
+        Build polished “How-To” guides in minutes by combining AI-generated narration and simple video editing tools.  
+        Perfect for onboarding, training walkthroughs, demos, and process guidance.
+      </p>
+
+      <ul class="space-y-3 text-base">
+        <li class="flex items-start">
+          <i class="fas fa-microphone accent-text mt-1 mr-3"></i>
+          <span><strong>Eleven Labs</strong> — create natural-sounding AI voiceovers (free tier available).</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fas fa-film accent-text mt-1 mr-3"></i>
+          <span><strong>Clipchamp</strong> — free Windows 11 video editor for assembling guides.</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fas fa-bolt accent-text mt-1 mr-3"></i>
+          <span>Script → AI Voice → Screen Recording → Edit → Export — all in under 10 minutes.</span>
+        </li>
+      </ul>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
+        <a href="https://elevenlabs.io/" target="_blank" rel="noopener"
+           class="bg-accent dark:bg-gray-800/50 p-4 rounded-lg shadow surface-light hover:scale-[1.03] transition flex items-center">
+          <i class="fas fa-volume-up accent-text text-xl mr-3"></i>
+          <span class="text-sm font-semibold">Eleven Labs (AI Voice)</span>
+        </a>
+
+        <a href="https://clipchamp.com/en/windows-video-editor/" target="_blank" rel="noopener"
+           class="bg-accent dark:bg-gray-800/50 p-4 rounded-lg shadow surface-light hover:scale-[1.03] transition flex items-center">
+          <i class="fas fa-video accent-text text-xl mr-3"></i>
+          <span class="text-sm font-semibold">Clipchamp (Video Editing)</span>
+        </a>
+      </div>
+
     </div>
 
-    <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-      <a href="https://elevenlabs.io/" target="_blank" rel="noopener" class="inline-block text-accent-color hover:underline">
-        Eleven Labs (AI voice generation)  
-      </a>
-      <a href="https://clipchamp.com/en/windows-video-editor/" target="_blank" rel="noopener" class="inline-block text-accent-color hover:underline">
-        Clipchamp (Windows 11 video editor)  
-      </a>
+    <!-- RIGHT COLUMN: VIDEO -->
+    <div class="flex justify-center items-center">
+      <div class="w-full max-w-xl aspect-video rounded-lg overflow-hidden shadow-lg">
+        <iframe width="100%" height="100%"
+                src="https://www.youtube.com/embed/sklPInQSh3c"
+                title="AI How-To Tutorial Demo"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen></iframe>
+      </div>
     </div>
 
-    <p class="mt-4 text-xs text-centre text-gray-300">
-      Use this workflow: script → AI voice → visuals → edit & publish. Perfect for onboarding, training, walkthroughs.
-    </p>
   </div>
 </section>
 
